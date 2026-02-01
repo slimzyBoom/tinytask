@@ -1,4 +1,3 @@
-````md
 # Contributing to TinyTasks
 
 Thanks for contributing to TinyTasks! This document explains how to set up the project locally, how we work with Git, and what standards we expect for commits and pull requests.
@@ -84,7 +83,6 @@ Depending on repo structure, you may have separate commands for backend/frontend
 
 ```bash
 yarn dev
-```
 
 #### Using npm
 
