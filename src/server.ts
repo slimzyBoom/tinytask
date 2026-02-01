@@ -8,5 +8,5 @@ connectDB();
 connectToRedis();
 
 app.listen(PORT, () => {
-    console.log(`Server is running on on port ${PORT}`);
+    console.log(`Server is running on port ${PORT}`);
 });
