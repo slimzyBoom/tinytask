@@ -214,6 +214,3 @@ If you find bugs or have feature ideas:
 ## Thank You
 
 TinyTasks is a trust-first platform. Contributions should reflect that: correct behavior, safe defaults, and predictable systems.
-
-```
-```
