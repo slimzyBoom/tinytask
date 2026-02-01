@@ -2,7 +2,7 @@
   "name": "learning_jest",
   "version": "1.0.0",
   "description": "This application is created to learn how to test ",
-  "main": "index.js",
+  "main": "server.js",
   "author": "JustCodes",
   "license": "MIT",
   "scripts": {
