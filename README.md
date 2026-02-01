@@ -136,13 +136,9 @@ Verification increases only when users attempt **higher-risk actions**.
 
 ## 🏗️ System Architecture (High Level)
 
-### Frontend
-- Mobile-first web app
-- React + Tailwind
-- Real-time features via WebSockets
 
 ### Backend
-- Node.js + Express
+- Node.js + Express + Typescript
 - REST APIs for core features
 - WebSockets for:
   - Messaging
@@ -150,9 +146,9 @@ Verification increases only when users attempt **higher-risk actions**.
   - Location updates
 
 ### Data Layer
-- PostgreSQL (primary data store)
-- Redis (sessions, rate limiting, background jobs)
-- Object storage for images and uploads
+- MongoDB 
+- Redis (sessions, background jobs)
+- Cloudinary for images and uploads
 
 ### External Services
 - Paystack (payments)
