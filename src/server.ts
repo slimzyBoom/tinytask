@@ -4,7 +4,7 @@ import passport from "passport";
 import "./common/configs/passportConfig"
 import { connectDB } from "./common/configs/dbConfig";
 import { connectToRedis } from "./common/configs/redisConfig";
-const PORT = Number(process.env.PORT);
+const PORT = Number(process.env.PORT) || 3000;
 
 connectDB();
 connectToRedis();
