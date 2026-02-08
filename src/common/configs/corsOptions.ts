@@ -1,4 +1,4 @@
-const origins = ["http://localhost:3000"];
+const origins = ["http://localhost:3000", "https://tinytask-45ei.onrender.com"];
 export const corsOptions = {
   origin: (
     origin: string | undefined,
