@@ -483,6 +483,7 @@ export const handleGoogleAuth = expressAsyncHandler(
         message: "Authenticated successfully",
         data: { access_token },
       });
+      return;
     }
 
     // REGISTER FLOW (new user)
