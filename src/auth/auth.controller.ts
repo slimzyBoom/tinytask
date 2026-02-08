@@ -28,7 +28,11 @@ import {
   validate_temp_token,
 } from "./auth.service";
 import { redisClient } from "../common/configs/redisConfig";
+import axios from "axios";
+
 const url = process.env.FRONTEND_URL as string;
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+const isProd = process.env.NODE_ENV === "production";
 
 export const registerController = expressAsyncHandler(
   async (req: Request, res: Response) => {
@@ -72,7 +76,7 @@ export const registerController = expressAsyncHandler(
     const token = await Token.create({
       userId: newUser._id,
       token: hashed_refresh_token,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 10000), // 7days
+      expiresAt: new Date(Date.now() + SEVEN_DAYS_MS), // 7days
     });
 
     if (!token) {
@@ -82,10 +86,10 @@ export const registerController = expressAsyncHandler(
       );
     }
 
-    res.cookie("refreshToken", refresh_token, {
+    res.cookie("refresh_token", refresh_token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "none",
+      secure: isProd,
+      sameSite: isProd ? "none" : "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
@@ -140,7 +144,7 @@ export const loginController = expressAsyncHandler(
     const token = await Token.create({
       userId: user._id,
       token: hashed_refresh_token,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 10000), // 7days
+      expiresAt: SEVEN_DAYS_MS, // 7days
     });
 
     if (!token) {
@@ -150,11 +154,11 @@ export const loginController = expressAsyncHandler(
       );
     }
 
-    res.cookie("refreshToken", refresh_token, {
+    res.cookie("refresh_token", refresh_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "none",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: SEVEN_DAYS_MS,
     });
 
     res.status(HttpStatus.Success).json({
@@ -288,8 +292,11 @@ export const verifyEmailController = expressAsyncHandler(
       { userId: existingUser._id },
       { $set: { emailVerified: true } },
     );
-    if(!updatedDoc.acknowledged){
-      throw new AppError("User verification not updated", HttpStatus.ServerError)
+    if (!updatedDoc.acknowledged) {
+      throw new AppError(
+        "User verification not updated",
+        HttpStatus.ServerError,
+      );
     }
     res
       .status(HttpStatus.Success)
@@ -398,19 +405,134 @@ export const refreshTokenController = expressAsyncHandler(
     await Token.create({
       userId: decoded.user_id,
       token: new_hashed_refresh_token,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 10000), // 7days
+      expiresAt: new Date(Date.now() + SEVEN_DAYS_MS), // 7days
     });
 
-    res.cookie("refreshToken", new_refresh_token, {
+    res.cookie("refresh_token", new_refresh_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "none",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: SEVEN_DAYS_MS, // 7 days
     });
 
     res.status(HttpStatus.Created).json({
       success: true,
       message: "Token refreshed successfully",
+      data: { access_token },
+    });
+  },
+);
+
+export const handleGoogleAuth = expressAsyncHandler(
+  async (req: Request, res: Response) => {
+    const { profile, accessToken } = req.user as any;
+
+    if (!profile || !accessToken) {
+      throw new AppError("Google auth error", HttpStatus.ServerError);
+    }
+
+    const email = profile.emails?.[0]?.value;
+    const emailVerified = profile.emails?.[0]?.verified ?? false;
+
+    if (!email) {
+      throw new AppError(
+        "Google account must have an email",
+        HttpStatus.BadRequest,
+      );
+    }
+
+    const existingUser = await User.findOne({ email }).lean();
+
+    // LOGIN FLOW
+    if (existingUser) {
+      const userVerification = await UserVerification.findOne({
+        userId: existingUser._id,
+      }).lean();
+      if (!userVerification) {
+        throw new AppError(
+          "Missing verification schema",
+          HttpStatus.ServerError,
+        );
+      }
+
+      const { access_token, refresh_token: new_refresh_token } =
+        generate_tokens({
+          user_id: existingUser._id,
+          tier: userVerification.tier,
+        });
+
+      await Token.create({
+        userId: existingUser._id,
+        token: hash_token(new_refresh_token),
+        expiresAt: new Date(Date.now() + SEVEN_DAYS_MS),
+      });
+
+      res.cookie("refresh_token", new_refresh_token, {
+        httpOnly: true,
+        secure: isProd,
+        sameSite: isProd ? "none" : "lax",
+        maxAge: SEVEN_DAYS_MS,
+      });
+
+      if (isProd) {
+        res.status(301).redirect(`${url}/complete-signup`);
+        return;
+      }
+      res.status(HttpStatus.Success).json({
+        success: true,
+        message: "Authenticated successfully",
+        data: { access_token },
+      });
+    }
+
+    // REGISTER FLOW (new user)
+    const { data } = await axios.get(
+      "https://people.googleapis.com/v1/people/me?personFields=phoneNumbers",
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
+
+    const phones = (data.phoneNumbers ?? []).map((p: any) => ({
+      value: p.value,
+      verified: p.metadata?.verified ?? false,
+    }));
+
+    const newUser = await User.create({
+      firstname: profile.name?.givenName ?? "",
+      lastname: profile.name?.familyName ?? "",
+      email,
+      phone_number: phones[0]?.value ?? "",
+    });
+
+    const newUserVerification = await UserVerification.create({
+      userId: newUser._id,
+      emailVerified,
+    });
+
+    const { access_token, refresh_token: new_refresh_token } = generate_tokens({
+      user_id: newUser._id,
+      tier: newUserVerification.tier,
+    });
+
+    await Token.create({
+      userId: newUser._id,
+      token: hash_token(new_refresh_token),
+      expiresAt: new Date(Date.now() + SEVEN_DAYS_MS),
+    });
+
+    res.cookie("refresh_token", new_refresh_token, {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: isProd ? "none" : "lax",
+      maxAge: SEVEN_DAYS_MS,
+    });
+
+    if (isProd) {
+      res.status(301).redirect(`${url}/complete-signup`);
+      return;
+    }
+    res.status(HttpStatus.Success).json({
+      success: true,
+      message: "Authenticated successfully",
       data: { access_token },
     });
   },
