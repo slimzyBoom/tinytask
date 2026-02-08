@@ -144,7 +144,7 @@ export const loginController = expressAsyncHandler(
     const token = await Token.create({
       userId: user._id,
       token: hashed_refresh_token,
-      expiresAt: SEVEN_DAYS_MS, // 7days
+      expiresAt:  new Date(Date.now() + SEVEN_DAYS_MS), // 7days
     });
 
     if (!token) {
