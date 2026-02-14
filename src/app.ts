@@ -6,12 +6,12 @@ import morgan from "morgan";
 import helmet from "helmet";
 import cors from "cors";
 import { HttpStatus } from "./common/enums/http_status_codes";
-import { corsOptions } from "./common/configs/corsOptions";
+import { buildCorsOptions } from "./common/configs/configFactory";
 import { errorHandler } from "./common/middlewares/errorHandler";
 const app = express();
 
 app.use(helmet());
-app.use(cors(corsOptions));
+app.use(cors(buildCorsOptions()));
 app.use(morgan(process.env.NODE_ENV === "development" ? "dev" : "combined"));
 app.use(express.json());
 app.use(cookieParser());
